@@ -13,6 +13,8 @@
   "voiceConnecting": "Connecting...",
   "voiceConnected": "Voice connected",
   "voiceFailed": "Connection failed",
+  "voiceReconnecting": "Reconnecting (attempt {{attempt}})",
+  "voiceReconnectIn": "Retrying in {{seconds}}s",
   "voiceDisconnected": "Disconnected",
   "disconnectVoice": "Disconnect",
   "turnOffCamera": "Turn off camera",

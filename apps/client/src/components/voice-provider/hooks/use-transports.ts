@@ -12,6 +12,28 @@ import {
 } from 'mediasoup-client/types';
 import { useCallback, useRef } from 'react';
 
+type TTransportKind = 'producer' | 'consumer';
+
+type TTransportState =
+  | 'new'
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'failed'
+  | 'closed';
+
+type TTransportFailureContext = {
+  transport: TTransportKind;
+  state: TTransportState;
+  error?: unknown;
+  reason?: string;
+};
+
+type TTransportIceErrorContext = {
+  transport: TTransportKind;
+  error: unknown;
+};
+
 type TUseTransportParams = {
   addRemoteUserStream: (
     userId: number,
@@ -31,13 +53,22 @@ type TUseTransportParams = {
     streamId: number,
     kind: StreamKind.EXTERNAL_AUDIO | StreamKind.EXTERNAL_VIDEO
   ) => void;
+  onTransportStateChange?: (
+    transport: TTransportKind,
+    state: TTransportState
+  ) => void;
+  onTransportFailure?: (failure: TTransportFailureContext) => void;
+  onTransportIceCandidateError?: (error: TTransportIceErrorContext) => void;
 };
 
 const useTransports = ({
   addRemoteUserStream,
   removeRemoteUserStream,
   addExternalStreamTrack,
-  removeExternalStreamTrack
+  removeExternalStreamTrack,
+  onTransportStateChange,
+  onTransportFailure,
+  onTransportIceCandidateError
 }: TUseTransportParams) => {
   const producerTransport = useRef<Transport<AppData> | undefined>(undefined);
   const consumerTransport = useRef<Transport<AppData> | undefined>(undefined);
@@ -80,10 +111,16 @@ const useTransports = ({
       );
 
       producerTransport.current.on('connectionstatechange', (state) => {
+        onTransportStateChange?.('producer', state);
         logVoice('Producer transport connection state changed', { state });
 
-        if (state === 'failed' || state === 'disconnected') {
-          logVoice(`Producer transport ${state}`);
+        if (state === 'failed') {
+          onTransportFailure?.({
+            transport: 'producer',
+            state,
+            reason: 'Producer transport failed'
+          });
+          logVoice('Producer transport failed');
           producerTransport.current?.close();
         } else if (state === 'closed') {
           logVoice('Producer transport closed');
@@ -92,6 +129,10 @@ const useTransports = ({
       });
 
       producerTransport.current.on('icecandidateerror', (error) => {
+        onTransportIceCandidateError?.({
+          transport: 'producer',
+          error
+        });
         logVoice('Producer transport ICE candidate error', { error });
       });
 
@@ -133,8 +174,13 @@ const useTransports = ({
       );
     } catch (error) {
       logVoice('Error creating producer transport', { error });
+      throw error;
     }
-  }, []);
+  }, [
+    onTransportFailure,
+    onTransportIceCandidateError,
+    onTransportStateChange
+  ]);
 
   const createConsumerTransport = useCallback(async (device: Device) => {
     logVoice('Creating consumer transport', { device });
@@ -167,10 +213,16 @@ const useTransports = ({
       );
 
       consumerTransport.current.on('connectionstatechange', (state) => {
+        onTransportStateChange?.('consumer', state);
         logVoice('Consumer transport connection state changed', { state });
 
-        if (state === 'failed' || state === 'disconnected') {
-          logVoice(`Consumer transport ${state}, attempting cleanup`);
+        if (state === 'failed') {
+          onTransportFailure?.({
+            transport: 'consumer',
+            state,
+            reason: 'Consumer transport failed'
+          });
+          logVoice('Consumer transport failed, attempting cleanup');
 
           Object.values(consumers.current).forEach((userConsumers) => {
             Object.values(userConsumers).forEach((consumer) => {
@@ -188,12 +240,21 @@ const useTransports = ({
       });
 
       consumerTransport.current.on('icecandidateerror', (error) => {
+        onTransportIceCandidateError?.({
+          transport: 'consumer',
+          error
+        });
         logVoice('Consumer transport ICE candidate error', { error });
       });
     } catch (error) {
       logVoice('Failed to create consumer transport', { error });
+      throw error;
     }
-  }, []);
+  }, [
+    onTransportFailure,
+    onTransportIceCandidateError,
+    onTransportStateChange
+  ]);
 
   const consume = useCallback(
     async (

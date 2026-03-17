@@ -13,6 +13,8 @@
   "voiceConnecting": "连接中...",
   "voiceConnected": "语音已连接",
   "voiceFailed": "连接失败",
+  "voiceReconnecting": "重新连接中（第 {{attempt}} 次）",
+  "voiceReconnectIn": "预计 {{seconds}} 秒后重试",
   "voiceDisconnected": "已断开",
   "disconnectVoice": "断开连接",
   "turnOffCamera": "关闭摄像头",

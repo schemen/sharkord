@@ -385,6 +385,10 @@ class VoiceRuntime {
     this.consumerTransports[userId] = transport;
 
     transport.observer.on('close', () => {
+      if (this.consumerTransports[userId] !== transport) {
+        return;
+      }
+
       delete this.consumerTransports[userId];
 
       if (this.consumers[userId]) {
@@ -397,7 +401,10 @@ class VoiceRuntime {
     });
 
     transport.on('dtlsstatechange', (state) => {
-      if (state === 'failed' || state === 'closed') {
+      if (
+        (state === 'failed' || state === 'closed') &&
+        this.consumerTransports[userId] === transport
+      ) {
         this.removeConsumerTransport(userId);
       }
     });
@@ -423,6 +430,10 @@ class VoiceRuntime {
     this.producerTransports[userId] = transport;
 
     transport.observer.on('close', () => {
+      if (this.producerTransports[userId] !== transport) {
+        return;
+      }
+
       delete this.producerTransports[userId];
 
       this.removeProducer(userId, StreamKind.AUDIO);
@@ -431,7 +442,10 @@ class VoiceRuntime {
     });
 
     transport.on('dtlsstatechange', (state) => {
-      if (state === 'failed' || state === 'closed') {
+      if (
+        (state === 'failed' || state === 'closed') &&
+        this.producerTransports[userId] === transport
+      ) {
         this.removeProducerTransport(userId);
       }
     });
@@ -486,6 +500,10 @@ class VoiceRuntime {
     }
 
     producer.observer.on('close', () => {
+      if (this.getProducer(type, userId) !== producer) {
+        return;
+      }
+
       if (type === StreamKind.VIDEO) {
         delete this.videoProducers[userId];
       } else if (type === StreamKind.AUDIO) {
@@ -545,6 +563,10 @@ class VoiceRuntime {
     this.consumers[userId][remoteId] = consumer;
 
     consumer.observer.on('close', () => {
+      if (this.consumers[userId]?.[remoteId] !== consumer) {
+        return;
+      }
+
       delete this.consumers[userId]?.[remoteId];
     });
   };

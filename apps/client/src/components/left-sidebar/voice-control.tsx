@@ -16,7 +16,7 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalAudioStreams } from '../channel-view/voice/external-audio-streams';
 import { VoiceAudioStreams } from '../channel-view/voice/voice-audio-streams';
@@ -31,8 +31,34 @@ const VoiceControl = memo(() => {
     toggleWebcam,
     toggleScreenShare,
     connectionStatus,
+    reconnectStatusText,
+    reconnectAttempt,
+    reconnectNextRetryAt,
     isScreenShareSupported
   } = useVoice();
+
+  const [retryDelaySeconds, setRetryDelaySeconds] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (connectionStatus !== 'reconnecting' || !reconnectNextRetryAt) {
+      setRetryDelaySeconds(null);
+      return;
+    }
+
+    const updateDelay = () => {
+      setRetryDelaySeconds(
+        Math.max(0, Math.ceil((reconnectNextRetryAt - Date.now()) / 1000))
+      );
+    };
+
+    updateDelay();
+
+    const timer = setInterval(updateDelay, 1000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [connectionStatus, reconnectNextRetryAt]);
 
   const connectionInfo = useMemo(() => {
     switch (connectionStatus) {
@@ -48,6 +74,12 @@ const VoiceControl = memo(() => {
           text: t('voiceConnected'),
           color: 'text-green-600'
         };
+      case 'reconnecting':
+        return {
+          icon: <Loader2 className="h-4 w-4 animate-spin text-amber-500" />,
+          text: t('voiceReconnecting', { attempt: reconnectAttempt }),
+          color: 'text-amber-500'
+        };
       case 'failed':
         return {
           icon: <AlertTriangle className="h-4 w-4 text-red-500" />,
@@ -62,7 +94,27 @@ const VoiceControl = memo(() => {
           color: 'text-red-500'
         };
     }
-  }, [connectionStatus, t]);
+  }, [
+    connectionStatus,
+    reconnectAttempt,
+    t
+  ]);
+
+  const reconnectInfo = useMemo(() => {
+    if (connectionStatus !== 'reconnecting') {
+      return null;
+    }
+
+    if (reconnectStatusText) {
+      return reconnectStatusText;
+    }
+
+    if (!retryDelaySeconds) {
+      return null;
+    }
+
+    return t('voiceReconnectIn', { seconds: retryDelaySeconds });
+  }, [connectionStatus, reconnectStatusText, retryDelaySeconds, t]);
 
   if (!voiceChannelId) {
     return null;
@@ -79,6 +131,11 @@ const VoiceControl = memo(() => {
             <span className={cn('text-xs font-medium', connectionInfo.color)}>
               {connectionInfo.text}
             </span>
+            {reconnectInfo && (
+              <span className="text-xs text-muted-foreground">
+                {reconnectInfo}
+              </span>
+            )}
           </div>
         </StatsPopover>
 
