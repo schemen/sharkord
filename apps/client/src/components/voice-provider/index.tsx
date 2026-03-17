@@ -1190,7 +1190,7 @@ const VoiceProvider = memo(({ children }: TVoiceProviderProps) => {
     },
     onReconnectGiveUp: () => {
       toast.error('Could not reconnect. You were disconnected from voice chat.');
-      void leaveVoice();
+      void leaveVoice({ reason: 'reconnect_give_up' });
     },
     isPermanentFailure: isPermanentReconnectFailure
   });
